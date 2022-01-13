@@ -25,32 +25,24 @@ import java.util.List;
 import java.util.UUID;
 import jenkins.model.Jenkins;
 import org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl;
-import org.junit.rules.TestRule;
-import org.junit.runner.Description;
-import org.junit.runners.model.Statement;
 
 /**
  * @author Robin Müller
  */
-public class GitLabRule implements TestRule {
+public class GitLabRule {
     private static final String API_TOKEN_ID = "apiTokenId";
     private static final String PASSWORD = "integration-test";
 
     private final String url;
-    private final int postgresPort;
+    private final String postgresAddress;
 
     private GitLabClient clientCache;
 
     private List<String> projectIds = new ArrayList<>();
 
-    public GitLabRule(String url, int postgresPort) {
+    public GitLabRule(String url, String postgresAddress) {
         this.url = url;
-        this.postgresPort = postgresPort;
-    }
-
-    @Override
-    public Statement apply(Statement base, Description description) {
-        return new GitlabStatement(base);
+        this.postgresAddress = postgresAddress;
     }
 
     public Project getProject(final String projectName) {
@@ -109,7 +101,7 @@ public class GitLabRule implements TestRule {
         return PASSWORD;
     }
 
-    private void cleanup() {
+    public void cleanup() {
         for (String projectId : projectIds) {
             String randomProjectName = UUID.randomUUID().toString();
             // rename the project before deleting as the deletion will take a while
@@ -121,7 +113,7 @@ public class GitLabRule implements TestRule {
     private String getApiToken() {
         try {
             Class.forName("org.postgresql.Driver");
-            try (Connection connection = DriverManager.getConnection("jdbc:postgresql://localhost:" + postgresPort + "/gitlabhq_production", "gitlab", "password")) {
+            try (Connection connection = DriverManager.getConnection("jdbc:postgresql://" + postgresAddress + "/gitlabhq_production", "gitlab", "password")) {
                 ResultSet resultSet = connection.createStatement().executeQuery("SELECT authentication_token FROM users WHERE username = 'root'");
                 resultSet.next();
                 return resultSet.getString("authentication_token");
@@ -140,20 +132,4 @@ public class GitLabRule implements TestRule {
         return clientCache;
     }
 
-    private class GitlabStatement extends Statement {
-        private final Statement next;
-
-        private GitlabStatement(Statement next) {
-            this.next = next;
-        }
-
-        @Override
-        public void evaluate() throws Throwable {
-            try {
-                next.evaluate();
-            } finally {
-                GitLabRule.this.cleanup();
-            }
-        }
-    }
 }

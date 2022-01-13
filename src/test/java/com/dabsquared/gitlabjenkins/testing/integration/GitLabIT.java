@@ -16,6 +16,7 @@ import com.dabsquared.gitlabjenkins.gitlab.api.model.Pipeline;
 import com.dabsquared.gitlabjenkins.publisher.GitLabCommitStatusPublisher;
 import com.dabsquared.gitlabjenkins.testing.gitlab.rule.GitLabRule;
 import com.dabsquared.gitlabjenkins.trigger.filter.BranchFilterType;
+import com.dabsquared.gitlabjenkins.util.GitLabServerRule;
 import hudson.Launcher;
 import hudson.model.AbstractBuild;
 import hudson.model.BuildListener;
@@ -38,6 +39,8 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -50,16 +53,29 @@ import org.jvnet.hudson.test.TestNotifier;
  * @author Robin Müller
  */
 public class GitLabIT {
-    private static final String GITLAB_URL = "http://localhost:" + System.getProperty("gitlab.http.port", "10080");
 
     @Rule
-    public GitLabRule gitlab = new GitLabRule(GITLAB_URL, Integer.parseInt(System.getProperty("postgres.port", "5432")));
+    public GitLabServerRule gitlabServer = new GitLabServerRule();
+
+    public GitLabRule gitlab;
 
     @Rule
     public JenkinsRule jenkins = new JenkinsRule();
 
     @Rule
     public TemporaryFolder tmp = new TemporaryFolder();
+
+    @Before
+    public void setup() {
+        final String url = gitlabServer.getUrl();
+        final String postgresAddress = gitlabServer.getPostgresAddress();
+        gitlab = new GitLabRule(url, postgresAddress);
+    }
+
+    @After
+    public void teardown() {
+        gitlab.cleanup();
+    }
 
     @Test
     public void buildOnPush() throws IOException, InterruptedException, GitAPIException {
